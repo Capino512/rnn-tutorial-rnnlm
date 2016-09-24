@@ -3,6 +3,8 @@ import theano as theano
 import theano.tensor as T
 from utils import *
 import operator
+from datetime import datetime
+import sys
 
 class RNNTheano:
     
@@ -66,7 +68,31 @@ class RNNTheano:
     def calculate_loss(self, X, Y):
         # Divide calculate_loss by the number of words
         num_words = np.sum([len(y) for y in Y])
-        return self.calculate_total_loss(X,Y)/float(num_words)   
+        return self.calculate_total_loss(X,Y)/float(num_words)
+
+    def train_with_sgd(self, X_train, y_train, learning_rate=0.005, nepoch=1, evaluate_loss_after=5):
+        # We keep track of the losses so we can plot them later
+        losses = []
+        num_examples_seen = 0
+        for epoch in range(nepoch):
+            # Optionally evaluate the loss
+            if (epoch % evaluate_loss_after == 0):
+                loss = self.calculate_loss(X_train, y_train)
+                losses.append((num_examples_seen, loss))
+                time = datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
+                print "%s: Loss after num_examples_seen=%d epoch=%d: %f" % (time, num_examples_seen, epoch, loss)
+                # Adjust the learning rate if loss increases
+                if (len(losses) > 1 and losses[-1][1] > losses[-2][1]):
+                    learning_rate = learning_rate * 0.5  
+                    print "Setting learning rate to %f" % learning_rate
+                sys.stdout.flush()
+                # ADDED! Saving model oarameters
+                save_model_parameters_theano("./data/rnn-theano-%d-%d-%s.npz" % (self.hidden_dim, self.word_dim, time), self)
+            # For each training example...
+            for i in range(len(y_train)):
+                # One SGD step
+                self.sgd_step(X_train[i], y_train[i], learning_rate)
+                num_examples_seen += 1
 
 
 def gradient_check_theano(model, x, y, h=0.001, error_threshold=0.01):
